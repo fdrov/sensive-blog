@@ -142,3 +142,4 @@ media
 *.sqlite
 notes.md
 venv
+/test.py
