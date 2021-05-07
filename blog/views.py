@@ -1,5 +1,6 @@
 from django.db.models import Count
 from django.shortcuts import render
+
 from blog.models import Comment, Post, Tag
 
 
@@ -38,19 +39,24 @@ def serialize_tag(tag):
     }
 
 
-# def get_likes_count(post):
-#     return post.likes__count
 def get_related_posts_count(tag):
     return tag.posts.count()
 
 
 def index(request):
     posts = Post.objects.all().prefetch_related('author')
-    popular_posts = posts.annotate(Count('likes', distinct=True),
-                                   Count('comments', distinct=True)).order_by('-likes__count')
+    popular_posts = posts.annotate(Count('likes')).order_by('-likes__count')
     most_popular_posts = popular_posts[:5]
 
-    fresh_posts = posts.annotate(Count('comments', distinct=True)).order_by('published_at')
+    most_popular_posts_ids = [post.id for post in most_popular_posts]
+    posts_with_comments = Post.objects.filter(
+        id__in=most_popular_posts_ids).annotate(Count('comments'))
+    ids_and_comments = posts_with_comments.values_list('id', 'comments__count')
+    count_for_ids = dict(ids_and_comments)
+    for post in most_popular_posts:
+        post.comments__count = count_for_ids[post.id]
+
+    fresh_posts = posts.annotate(Count('comments')).order_by('published_at')
     most_fresh_posts = list(fresh_posts)[-5:]
 
     tags = Tag.objects.all()
@@ -61,7 +67,8 @@ def index(request):
         'most_popular_posts': [
             serialize_post_optimized(post) for post in most_popular_posts
         ],
-        'page_posts': [serialize_post_optimized(post) for post in most_fresh_posts],
+        'page_posts': [serialize_post_optimized(post) for post in
+                       most_fresh_posts],
         'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
