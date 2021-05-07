@@ -1,6 +1,32 @@
-from django.db import models
-from django.urls import reverse
 from django.contrib.auth.models import User
+from django.db import models
+from django.db.models import Count
+from django.urls import reverse
+
+
+class PostQuerySet(models.QuerySet):
+
+    def popular(self):
+        posts_by_likes = self.annotate(Count('likes')).order_by('-likes__count')
+        return posts_by_likes
+
+    def fetch_with_comments_count(self):
+        most_popular_posts_ids = [post.id for post in self]
+        posts_with_comments = Post.objects.filter(
+            id__in=most_popular_posts_ids).annotate(Count('comments'))
+        ids_and_comments = posts_with_comments.values_list('id',
+                                                           'comments__count')
+        count_for_ids = dict(ids_and_comments)
+        for post in self:
+            post.comments__count = count_for_ids[post.id]
+        return self
+
+
+class TagQuerySet(models.QuerySet):
+
+    def popular(self):
+        tags_by_posts = self.annotate(Count('posts')).order_by('-posts__count')
+        return tags_by_posts
 
 
 class Post(models.Model):
@@ -25,8 +51,10 @@ class Post(models.Model):
         related_name='posts',
         verbose_name='Теги')
 
+    objects = PostQuerySet.as_manager()
+
     def __str__(self):
-        return self.title
+        return f'{self.title}, {self.published_at.year}'
 
     def get_absolute_url(self):
         return reverse('post_detail', args={'slug': self.slug})
@@ -39,6 +67,8 @@ class Post(models.Model):
 
 class Tag(models.Model):
     title = models.CharField('Тег', max_length=20, unique=True)
+
+    objects = TagQuerySet.as_manager()
 
     def __str__(self):
         return self.title
