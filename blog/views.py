@@ -21,6 +21,13 @@ def serialize_post_optimized(post):
 def serialize_tag(tag):
     return {
         'title': tag.title,
+        'posts_with_tag': len(Post.objects.filter(tags=tag)),
+    }
+
+
+def serialize_tag_optimized(tag):
+    return {
+        'title': tag.title,
         'posts_with_tag': tag.posts__count,
     }
 
@@ -50,7 +57,7 @@ def index(request):
         ],
         'page_posts': [serialize_post_optimized(post) for post in
                        most_fresh_posts],
-        'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
+        'popular_tags': [serialize_tag_optimized(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
 
