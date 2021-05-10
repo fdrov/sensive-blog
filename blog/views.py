@@ -52,7 +52,7 @@ def index(request):
         Prefetch('tags', queryset=Tag.objects.annotate(Count('posts')))
     )
     popular_posts = posts.popular()
-    most_popular_posts = five_most_popular_posts()
+    most_popular_posts = popular_posts[:5].fetch_with_comments_count()
 
     fresh_posts = posts.annotate(Count('comments')).order_by('published_at')
     most_fresh_posts = list(fresh_posts)[-5:]
@@ -124,11 +124,12 @@ def tag_filter(request, tag_title):
     popular_tags = all_tags.popular()
     most_popular_tags = popular_tags[:5]
 
-    posts = Post.objects.all().prefetch_related('author')
-    popular_posts = posts.popular()
-    most_popular_posts = popular_posts[:5].fetch_with_comments_count()
+    most_popular_posts = five_most_popular_posts()
 
-    related_posts = tag.posts.all()[:20].fetch_with_comments_count()
+    related_posts = tag.posts.all()[:20].prefetch_related(
+        'author',
+        Prefetch('tags', queryset=Tag.objects.annotate(Count('posts')))
+    ).fetch_with_comments_count()
 
     context = {
         'tag': tag.title,
